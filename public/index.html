@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Certificate Generator - Bulk Certificate Creation</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>📜 Certificate Generator</h1>
+        <p class="subtitle">Generate professional certificates in bulk</p>
+      </header>
+
+      <div class="main-content">
+        <!-- Step 1: Template Selection -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Step 1: Select or Upload Template</h2>
+          </div>
+          <div class="card-body">
+            <div class="template-options">
+              <div class="option-group">
+                <label>
+                  <input
+                    type="radio"
+                    name="templateOption"
+                    value="existing"
+                    checked
+                  />
+                  Use Existing Template
+                </label>
+                <div id="existingTemplateSection" class="sub-section">
+                  <select id="templateSelect" class="form-control">
+                    <option value="">Loading templates...</option>
+                  </select>
+                  <button id="refreshTemplates" class="btn btn-secondary">
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div class="option-group">
+                <label>
+                  <input type="radio" name="templateOption" value="new" />
+                  Upload New Template
+                </label>
+                <div
+                  id="newTemplateSection"
+                  class="sub-section"
+                  style="display: none"
+                >
+                  <div class="file-upload-area" id="templateDropZone">
+                    <input
+                      type="file"
+                      id="templateFile"
+                      accept="image/png,image/jpeg,image/jpg"
+                      hidden
+                    />
+                    <p>📤 Click or drag image here</p>
+                    <small>Supported formats: PNG, JPG, JPEG</small>
+                  </div>
+                  <button
+                    id="saveTemplateBtn"
+                    class="btn btn-secondary"
+                    style="display: none"
+                  >
+                    💾 Save Template for Future Use
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              id="templatePreview"
+              class="template-preview"
+              style="display: none"
+            >
+              <h4>Template Preview:</h4>
+              <img id="previewImage" src="" alt="Template preview" />
+              <button
+                id="mapFieldsBtn"
+                class="btn btn-secondary"
+                style="margin-top: 15px; display: none"
+              >
+                🎯 Map Fields on Template
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 2: CSV Upload -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Step 2: Upload CSV Data</h2>
+          </div>
+          <div class="card-body">
+            <div class="file-upload-area" id="csvDropZone">
+              <input type="file" id="csvFile" accept=".csv" hidden />
+              <p>📊 Click or drag CSV file here</p>
+              <small
+                >CSV should contain columns like: name, course, date,
+                etc.</small
+              >
+            </div>
+
+            <div id="csvPreview" class="csv-preview" style="display: none">
+              <h4>CSV Preview:</h4>
+              <div id="csvTable"></div>
+              <p class="info-text">
+                Found <strong id="recordCount">0</strong> records
+              </p>
+            </div>
+
+            <div class="example-section">
+              <details>
+                <summary>📋 View CSV Example Format</summary>
+                <pre>
+name,course,date
+John Doe,Web Development,2024-01-15
+Jane Smith,Data Science,2024-01-16
+Mike Johnson,AI & Machine Learning,2024-01-17</pre
+                >
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 3: Generate -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Step 3: Generate Certificates</h2>
+          </div>
+          <div class="card-body">
+            <div class="action-section">
+              <button id="generateBtn" class="btn btn-primary" disabled>
+                🚀 Generate Certificates
+              </button>
+              <div
+                id="progressSection"
+                class="progress-section"
+                style="display: none"
+              >
+                <div class="progress-bar">
+                  <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <p id="progressText">Processing...</p>
+              </div>
+            </div>
+
+            <div
+              id="resultSection"
+              class="result-section"
+              style="display: none"
+            >
+              <div class="success-message">
+                <h3>✅ Success!</h3>
+                <p>
+                  Generated
+                  <strong id="certificateCount">0</strong> certificates
+                </p>
+                <a id="downloadLink" href="#" class="btn btn-success" download>
+                  📥 Download All Certificates (ZIP)
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <p>Certificate Generator v1.0 | Built for bulk certificate creation</p>
+      </footer>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
