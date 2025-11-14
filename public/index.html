@@ -128,7 +128,6 @@
               class="file-upload-area"
               id="csvDropZone"
               style="cursor: pointer"
-              onclick="document.getElementById('csvFile').click()"
             >
               <input
                 type="file"
@@ -173,12 +172,7 @@ Mike Johnson,AI & Machine Learning,2024-01-17</pre
           </div>
           <div class="card-body">
             <div class="action-section">
-              <button
-                id="generateBtn"
-                class="btn btn-primary"
-                disabled
-                onclick="if(window.handleGenerate) window.handleGenerate()"
-              >
+              <button id="generateBtn" class="btn btn-primary" disabled>
                 🚀 Generate Certificates
               </button>
               <div

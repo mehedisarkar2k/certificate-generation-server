@@ -373,8 +373,9 @@
             <h4 style="margin-bottom: 10px; color: #2e7d32">🔤 Custom Fonts</h4>
             <div
               style="
-                display: flex;
-                gap: 10px;
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 8px;
                 align-items: center;
                 margin-bottom: 8px;
               "
@@ -384,7 +385,7 @@
                 id="fontFileInput"
                 accept=".ttf,.otf"
                 multiple
-                style="flex: 1; font-size: 0.85rem"
+                style="font-size: 0.85rem; min-width: 0"
               />
               <button
                 id="uploadFontBtn"
@@ -393,9 +394,11 @@
                   white-space: nowrap;
                   background: #4caf50;
                   border-color: #4caf50;
+                  padding: 6px 12px;
+                  font-size: 0.85rem;
                 "
               >
-                ⬆️ Upload Font
+                ⬆️ Upload
               </button>
             </div>
             <div

@@ -10,6 +10,9 @@ let state = {
   scale: 1,
   nextFieldId: 1,
   customFonts: [], // List of uploaded custom fonts
+  draggingField: null, // Field being dragged
+  draggingHandle: null, // 'left', 'right', or null
+  selectedFieldId: null, // Currently selected field
 };
 
 // DOM Elements
@@ -55,6 +58,9 @@ async function initializeMapper() {
   await loadExistingFieldMappings(templateId);
 
   // Event listeners
+  canvas.addEventListener('mousedown', handleCanvasMouseDown);
+  canvas.addEventListener('mousemove', handleCanvasMouseMove);
+  canvas.addEventListener('mouseup', handleCanvasMouseUp);
   canvas.addEventListener('click', handleCanvasClick);
   csvFileMapper.addEventListener('change', handleCSVUpload);
   fontFileInput.addEventListener('change', handleFontFileSelect);
@@ -89,6 +95,13 @@ function loadTemplateImage(src) {
 }
 
 function handleCanvasClick(e) {
+  // Don't add field if we just finished dragging
+  if (state.draggingField) {
+    state.draggingField = null;
+    state.draggingHandle = null;
+    return;
+  }
+
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
@@ -96,7 +109,119 @@ function handleCanvasClick(e) {
   const x = Math.round((e.clientX - rect.left) * scaleX);
   const y = Math.round((e.clientY - rect.top) * scaleY);
 
+  // Check if clicking on existing line to select it
+  for (let field of state.fields) {
+    const lineY = field.y;
+    const lineStartX = field.x;
+    const lineEndX = field.x + (field.width || 500);
+
+    if (
+      Math.abs(y - lineY) < 10 &&
+      x >= lineStartX - 10 &&
+      x <= lineEndX + 10
+    ) {
+      state.selectedFieldId = field.id;
+      redrawCanvas();
+      return;
+    }
+  }
+
+  // Otherwise add new field
   addField(x, y);
+}
+
+function handleCanvasMouseDown(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+
+  // Check if clicking on a handle
+  for (let field of state.fields) {
+    const lineY = field.y;
+    const lineStartX = field.x;
+    const lineEndX = field.x + (field.width || 500);
+    const handleSize = 10;
+
+    // Check left handle
+    if (
+      Math.abs(x - lineStartX) < handleSize &&
+      Math.abs(y - lineY) < handleSize
+    ) {
+      state.draggingField = field;
+      state.draggingHandle = 'left';
+      canvas.style.cursor = 'ew-resize';
+      e.preventDefault();
+      return;
+    }
+
+    // Check right handle
+    if (
+      Math.abs(x - lineEndX) < handleSize &&
+      Math.abs(y - lineY) < handleSize
+    ) {
+      state.draggingField = field;
+      state.draggingHandle = 'right';
+      canvas.style.cursor = 'ew-resize';
+      e.preventDefault();
+      return;
+    }
+  }
+}
+
+function handleCanvasMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+
+  // If dragging, update field position/width
+  if (state.draggingField && state.draggingHandle) {
+    if (state.draggingHandle === 'left') {
+      const oldX = state.draggingField.x;
+      const oldWidth = state.draggingField.width || 500;
+      state.draggingField.x = x;
+      state.draggingField.width = oldX + oldWidth - x;
+    } else if (state.draggingHandle === 'right') {
+      state.draggingField.width = x - state.draggingField.x;
+    }
+    redrawCanvas();
+    renderFieldList();
+    e.preventDefault();
+    return;
+  }
+
+  // Change cursor when hovering over handles
+  let overHandle = false;
+  for (let field of state.fields) {
+    const lineY = field.y;
+    const lineStartX = field.x;
+    const lineEndX = field.x + (field.width || 500);
+    const handleSize = 10;
+
+    if (
+      (Math.abs(x - lineStartX) < handleSize &&
+        Math.abs(y - lineY) < handleSize) ||
+      (Math.abs(x - lineEndX) < handleSize && Math.abs(y - lineY) < handleSize)
+    ) {
+      overHandle = true;
+      break;
+    }
+  }
+
+  canvas.style.cursor = overHandle ? 'ew-resize' : 'crosshair';
+}
+
+function handleCanvasMouseUp(e) {
+  if (state.draggingField) {
+    state.draggingField = null;
+    state.draggingHandle = null;
+    canvas.style.cursor = 'crosshair';
+  }
 }
 
 function addField(x, y, columnName = null) {
@@ -113,6 +238,8 @@ function addField(x, y, columnName = null) {
     color: '#000000',
     align: 'left', // Default to left so text starts at clicked point
     width: 500,
+    endX: x + 500, // Initialize end point
+    endY: y + 50, // Initialize end Y
   };
 
   state.fields.push(field);
@@ -128,62 +255,97 @@ function redrawCanvas() {
     ctx.drawImage(state.templateImage, 0, 0);
   }
 
-  // Draw markers and preview text for each field
+  // Draw fields with horizontal alignment lines
   state.fields.forEach((field) => {
+    const isSelected = field.id === state.selectedFieldId;
+    const lineY = field.y;
+    const lineStartX = field.x;
+    const lineEndX = field.x + (field.width || 500);
+
+    // Draw horizontal alignment line
+    ctx.strokeStyle = isSelected ? '#ff6b6b' : '#667eea';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(lineStartX, lineY);
+    ctx.lineTo(lineEndX, lineY);
+    ctx.stroke();
+
+    // Draw draggable handles at line ends
+    const handleSize = 10;
+
+    // Left handle
+    ctx.fillStyle = isSelected ? '#ff6b6b' : '#667eea';
+    ctx.fillRect(
+      lineStartX - handleSize / 2,
+      lineY - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      lineStartX - handleSize / 2,
+      lineY - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+
+    // Right handle
+    ctx.fillRect(
+      lineEndX - handleSize / 2,
+      lineY - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+    ctx.strokeRect(
+      lineEndX - handleSize / 2,
+      lineY - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+
     // Draw preview text if CSV data is available
     if (state.csvData && state.csvData[field.csvColumn]) {
       const previewText = state.csvData[field.csvColumn];
-
-      // Set font properties for preview
       const fontSize = field.fontSize || 36;
       const fontWeight = field.fontWeight || 'normal';
-      const fontFamily = 'Arial'; // Canvas uses web fonts
 
-      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.font = `${fontWeight} ${fontSize}px Arial`;
       ctx.fillStyle = field.color || '#000000';
-
-      // Draw text at field position based on alignment
-      const align = field.align || 'left';
-      ctx.textAlign = align;
-
-      // Use baseline 'top' to match the click position better
       ctx.textBaseline = 'top';
 
-      ctx.fillText(previewText, field.x, field.y);
-    } // Draw crosshair marker
-    ctx.strokeStyle = '#667eea';
-    ctx.lineWidth = 2;
+      // Apply alignment
+      const align = field.align || 'left';
+      let textX = field.x;
 
-    // Vertical line
-    ctx.beginPath();
-    ctx.moveTo(field.x, field.y - 15);
-    ctx.lineTo(field.x, field.y + 15);
-    ctx.stroke();
+      if (align === 'center') {
+        textX = field.x + (field.width || 500) / 2;
+        ctx.textAlign = 'center';
+      } else if (align === 'right') {
+        textX = field.x + (field.width || 500);
+        ctx.textAlign = 'right';
+      } else {
+        ctx.textAlign = 'left';
+      }
 
-    // Horizontal line
-    ctx.beginPath();
-    ctx.moveTo(field.x - 15, field.y);
-    ctx.lineTo(field.x + 15, field.y);
-    ctx.stroke();
+      // Draw text touching the line (slightly above for better visibility)
+      ctx.fillText(
+        previewText,
+        textX,
+        lineY - fontSize - 5,
+        field.width || 500
+      );
+    }
 
-    // Draw circle
-    ctx.beginPath();
-    ctx.arc(field.x, field.y, 8, 0, 2 * Math.PI);
-    ctx.fillStyle = '#667eea';
-    ctx.fill();
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Draw field label (column name)
-    ctx.font = 'bold 14px Arial';
-    ctx.fillStyle = '#667eea';
+    // Draw field label
+    ctx.font = 'bold 12px Arial';
+    ctx.fillStyle = isSelected ? '#ff6b6b' : '#667eea';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(field.csvColumn, field.x, field.y - 25);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(field.csvColumn, (lineStartX + lineEndX) / 2, lineY - 5);
   });
 
-  // Reset text properties
+  // Reset ctx properties
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 }
@@ -363,14 +525,42 @@ function renderFieldList() {
                     </select>
                 </div>
                 
-                <div class="control-group">
-                    <label>Max Width:</label>
-                    <input type="number" value="${
-                      field.width
-                    }" min="100" max="2000"
-                           onchange="updateField(${
-                             field.id
-                           }, 'width', parseInt(this.value))">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>Start X:</label>
+                        <input type="number" value="${field.x}" 
+                               onchange="updateField(${
+                                 field.id
+                               }, 'x', parseInt(this.value))">
+                    </div>
+                    <div class="control-group">
+                        <label>Start Y:</label>
+                        <input type="number" value="${field.y}" 
+                               onchange="updateField(${
+                                 field.id
+                               }, 'y', parseInt(this.value))">
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label>End X:</label>
+                        <input type="number" value="${
+                          field.endX || field.x + (field.width || 500)
+                        }" 
+                               onchange="updateFieldEndPoint(${
+                                 field.id
+                               }, 'endX', parseInt(this.value))">
+                    </div>
+                    <div class="control-group">
+                        <label>End Y:</label>
+                        <input type="number" value="${
+                          field.endY || field.y + 50
+                        }" 
+                               onchange="updateFieldEndPoint(${
+                                 field.id
+                               }, 'endY', parseInt(this.value))">
+                    </div>
                 </div>
             </div>
         </div>
@@ -387,7 +577,6 @@ function updateField(fieldId, property, value) {
     showNotification(`Field ${fieldId} updated`, 'info');
   }
 }
-
 function deleteField(fieldId) {
   state.fields = state.fields.filter((f) => f.id !== fieldId);
   redrawCanvas();
@@ -689,12 +878,14 @@ function updateFontListDisplay() {
       '<em style="color: #999;">No custom fonts uploaded yet</em>';
   } else {
     fontListDisplay.innerHTML = `
-      <strong>Available Custom Fonts:</strong><br/>
+      <strong>Available Custom Fonts (${
+        state.customFonts.length
+      }):</strong><br/>
       ${state.customFonts
         .map(
           (font) =>
-            `<span style="display: inline-block; margin: 4px 6px; padding: 4px 8px; background: white; border-radius: 4px; font-size: 0.8rem;">
-              ${font.name}
+            `<span style="display: inline-block; margin: 4px 6px; padding: 4px 8px; background: white; border-radius: 4px; font-size: 0.8rem; border: 1px solid #ddd;">
+              📁 ${font.name}
               <button onclick="deleteFont('${font.id}')" style="margin-left: 5px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: bold;">×</button>
             </span>`
         )
