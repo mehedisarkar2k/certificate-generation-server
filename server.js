@@ -209,6 +209,7 @@ app.post(
 
         // Load field mappings if they exist
         const metadataPath = path.join('templates', `${templateId}.meta.json`);
+        console.log(`[Generate] Looking for metadata at: ${metadataPath}`);
         try {
           const metaContent = await fs.readFile(metadataPath, 'utf-8');
           const metadata = JSON.parse(metaContent);
@@ -216,7 +217,13 @@ app.post(
             metadata.fields && metadata.fields.length > 0
               ? metadata.fields
               : null;
+          console.log(
+            `[Generate] Loaded ${
+              fieldMappings?.length || 0
+            } field mappings from metadata`
+          );
         } catch (err) {
+          console.log(`[Generate] No metadata found: ${err.message}`);
           // No metadata, will use default field placement
         }
       } else {
@@ -243,7 +250,18 @@ app.post(
         : null;
       if (requestFieldMappings) {
         fieldMappings = requestFieldMappings;
+        console.log(
+          `[Generate] Using ${requestFieldMappings.length} field mappings from request`
+        );
       }
+
+      console.log(
+        `[Generate] Final fieldMappings: ${
+          fieldMappings
+            ? fieldMappings.length + ' fields'
+            : 'null (will use defaults)'
+        }`
+      );
 
       // Generate certificates
       const result = await generateCertificates(
@@ -325,6 +343,10 @@ app.post('/api/templates/:templateId/fields', async (req, res) => {
 
     const metadataPath = path.join('templates', `${templateId}.meta.json`);
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(
+      `[SaveFields] Saved ${fields.length} field mappings to ${metadataPath}`
+    );
 
     res.json({
       message: 'Field mappings saved successfully',

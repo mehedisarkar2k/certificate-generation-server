@@ -44,6 +44,16 @@ const notification = document.getElementById('notification');
 document.addEventListener('DOMContentLoaded', () => {
   loadTemplates();
   setupEventListeners();
+
+  // Show deployment warning if not localhost
+  const deploymentWarning = document.getElementById('deploymentWarning');
+  if (
+    deploymentWarning &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1')
+  ) {
+    deploymentWarning.style.display = 'block';
+  }
 });
 
 // Setup Event Listeners
