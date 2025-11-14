@@ -112,13 +112,42 @@ async function loadTemplates() {
 
     state.templates = data.templates || [];
 
-    templateSelect.innerHTML =
-      state.templates.length > 0
-        ? '<option value="">-- Select a template --</option>' +
-          state.templates
-            .map((t) => `<option value="${t.id}">${t.name}</option>`)
-            .join('')
-        : '<option value="">No templates saved yet</option>';
+    if (state.templates.length > 0) {
+      templateSelect.innerHTML =
+        '<option value="">-- Select a template --</option>' +
+        state.templates
+          .map((t) => `<option value="${t.id}">${t.name}</option>`)
+          .join('');
+
+      // Also create a template gallery view
+      const gallery = document.getElementById('templateGallery');
+      if (gallery) {
+        gallery.innerHTML = state.templates
+          .map(
+            (t) => `
+            <div class="template-card" data-template-id="${t.id}">
+              <img src="${t.path}" alt="${t.name}" />
+              <div class="template-card-info">
+                <h4>${t.name}</h4>
+                <div class="template-card-actions">
+                  <button onclick="selectTemplate('${t.id}')" class="btn btn-sm">Select</button>
+                  <button onclick="deleteTemplate('${t.id}', '${t.name}')" class="btn btn-sm btn-danger">🗑️</button>
+                </div>
+              </div>
+            </div>
+          `
+          )
+          .join('');
+      }
+    } else {
+      templateSelect.innerHTML =
+        '<option value="">No templates saved yet</option>';
+      const gallery = document.getElementById('templateGallery');
+      if (gallery) {
+        gallery.innerHTML =
+          '<p style="text-align: center; color: #888; padding: 20px;">No templates yet. Upload one below!</p>';
+      }
+    }
 
     showNotification(`Loaded ${state.templates.length} template(s)`, 'success');
   } catch (error) {
@@ -227,22 +256,44 @@ function handleCSVFileSelect(e) {
   const file = e.target.files[0];
 
   if (file) {
-    if (!file.name.endsWith('.csv')) {
-      showNotification('Please select a CSV file', 'error');
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const fileExt = file.name
+      .substring(file.name.lastIndexOf('.'))
+      .toLowerCase();
+
+    if (!validExtensions.includes(fileExt)) {
+      showNotification('Please select a CSV or Excel file', 'error');
       return;
     }
 
     state.csvFile = file;
 
-    // Parse and preview CSV
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const csvText = e.target.result;
-      parseAndPreviewCSV(csvText);
-    };
-    reader.readAsText(file);
+    // Parse and preview CSV/Excel
+    if (fileExt === '.csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const csvText = e.target.result;
+        parseAndPreviewCSV(csvText);
+      };
+      reader.readAsText(file);
+    } else {
+      // For Excel files, just show file info
+      state.csvData = {
+        headers: ['Excel file loaded'],
+        totalRows: 'Will be counted during generation',
+      };
+      csvTable.innerHTML = `<p style="padding: 15px; text-align: center; color: #666;">
+        <strong>${file.name}</strong><br/>
+        Excel file ready. Click generate to process.
+      </p>`;
+      recordCount.textContent = '?';
+      csvPreview.style.display = 'block';
+    }
 
-    showNotification('CSV loaded successfully', 'success');
+    showNotification(
+      `${fileExt.toUpperCase()} file loaded successfully`,
+      'success'
+    );
   }
 
   updateGenerateButton();
@@ -434,3 +485,55 @@ function showNotification(message, type = 'info') {
     notification.style.display = 'none';
   }, 3000);
 }
+
+// Delete template
+async function deleteTemplate(templateId, templateName) {
+  if (!confirm(`Are you sure you want to delete "${templateName}"?`)) {
+    return;
+  }
+
+  try {
+    showNotification('Deleting template...', 'info');
+    const response = await fetch(`/api/templates/${templateId}`, {
+      method: 'DELETE',
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showNotification('Template deleted successfully', 'success');
+      await loadTemplates();
+
+      // Clear selection if deleted template was selected
+      if (state.templateId === templateId) {
+        state.templateId = null;
+        templatePreview.style.display = 'none';
+        mapFieldsBtn.style.display = 'none';
+        updateGenerateButton();
+      }
+    } else {
+      throw new Error(data.error || 'Failed to delete template');
+    }
+  } catch (error) {
+    console.error('Error deleting template:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  }
+}
+
+// Select template from gallery
+function selectTemplate(templateId) {
+  const radio = document.querySelector(
+    'input[name="templateOption"][value="existing"]'
+  );
+  if (radio) {
+    radio.checked = true;
+    handleTemplateOptionChange({ target: radio });
+  }
+
+  templateSelect.value = templateId;
+  handleTemplateSelection({ target: templateSelect });
+}
+
+// Make functions globally available
+window.deleteTemplate = deleteTemplate;
+window.selectTemplate = selectTemplate;

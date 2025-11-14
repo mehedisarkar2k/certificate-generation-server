@@ -101,18 +101,38 @@ async function generateSingleCertificate(
         for (const mapping of fieldMappings) {
           const value = data[mapping.csvColumn] || '';
 
-          // Set font
+          // Set font (support custom fonts)
           const fontName = mapping.font || 'Helvetica-Bold';
           const fontSize = mapping.fontSize || 36;
-          doc.font(fontName).fontSize(fontSize);
+
+          // Check if it's a custom font (contains timestamp/uuid pattern)
+          if (
+            fontName.includes('-') &&
+            (fontName.endsWith('.ttf') || fontName.endsWith('.otf'))
+          ) {
+            // It's a custom font file
+            const fontPath = path.join('fonts', fontName);
+            try {
+              doc.font(fontPath).fontSize(fontSize);
+            } catch (fontError) {
+              console.warn(
+                `Custom font not found: ${fontName}, using Helvetica-Bold`
+              );
+              doc.font('Helvetica-Bold').fontSize(fontSize);
+            }
+          } else {
+            // Standard font
+            doc.font(fontName).fontSize(fontSize);
+          }
 
           // Set color
           const color = mapping.color || '#000000';
           doc.fillColor(color);
 
-          // Position - use exact click coordinates
+          // Position - use exact click coordinates with baseline adjustment
           const textX = mapping.x;
-          const textY = mapping.y;
+          // Adjust Y position to account for PDFKit baseline (text is drawn from baseline, not top)
+          const textY = mapping.y - fontSize * 0.75; // Approximate baseline adjustment
           const maxWidth = mapping.width || templateWidth - mapping.x - 50;
           const align = mapping.align || 'left'; // Default to left
 

@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { parse } = require('csv-parse/sync');
+const xlsx = require('xlsx');
 const { generateCertificates } = require('./services/certificateGenerator');
 const { v4: uuidv4 } = require('uuid');
 
@@ -16,7 +17,7 @@ app.use('/output', express.static('output'));
 
 // Create necessary directories
 const initDirectories = async () => {
-  const dirs = ['uploads', 'output', 'templates'];
+  const dirs = ['uploads', 'output', 'templates', 'fonts'];
   for (const dir of dirs) {
     try {
       await fs.mkdir(dir, { recursive: true });
@@ -29,7 +30,9 @@ const initDirectories = async () => {
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = file.fieldname === 'template' ? 'templates' : 'uploads';
+    let uploadDir = 'uploads';
+    if (file.fieldname === 'template') uploadDir = 'templates';
+    else if (file.fieldname === 'font') uploadDir = 'fonts';
     await fs.mkdir(uploadDir, { recursive: true });
     cb(null, uploadDir);
   },
@@ -62,7 +65,7 @@ const upload = multer({
         );
       }
     } else if (file.fieldname === 'csvFile') {
-      const allowedTypes = /csv/;
+      const allowedTypes = /csv|xlsx|xls/;
       const extname = allowedTypes.test(
         path.extname(file.originalname).toLowerCase()
       );
@@ -70,12 +73,44 @@ const upload = multer({
       if (extname) {
         return cb(null, true);
       } else {
-        cb(new Error('Only CSV files are allowed!'));
+        cb(new Error('Only CSV and Excel files are allowed!'));
+      }
+    } else if (file.fieldname === 'font') {
+      const allowedTypes = /ttf|otf/;
+      const extname = allowedTypes.test(
+        path.extname(file.originalname).toLowerCase()
+      );
+
+      if (extname) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Only TTF and OTF font files are allowed!'));
       }
     }
     cb(null, true);
   },
 });
+
+// Helper function to parse CSV or Excel files
+const parseDataFile = async (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.csv') {
+    const csvContent = await fs.readFile(filePath, 'utf-8');
+    return parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+  } else if (ext === '.xlsx' || ext === '.xls') {
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    return xlsx.utils.sheet_to_json(worksheet);
+  } else {
+    throw new Error('Unsupported file format');
+  }
+};
 
 // Routes
 
@@ -188,18 +223,13 @@ app.post(
         return res.status(400).json({ error: 'No CSV file uploaded' });
       }
 
-      const csvPath = req.files.csvFile[0].path;
+      const dataFilePath = req.files.csvFile[0].path;
 
-      // Parse CSV file
-      const csvContent = await fs.readFile(csvPath, 'utf-8');
-      const records = parse(csvContent, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
+      // Parse CSV or Excel file
+      const records = await parseDataFile(dataFilePath);
 
       if (records.length === 0) {
-        return res.status(400).json({ error: 'CSV file is empty or invalid' });
+        return res.status(400).json({ error: 'Data file is empty or invalid' });
       }
 
       // Get field mappings from request body if provided (overrides template mappings)
@@ -217,10 +247,10 @@ app.post(
         fieldMappings
       );
 
-      // Clean up uploaded CSV
+      // Clean up uploaded data file
       await fs
-        .unlink(csvPath)
-        .catch((err) => console.error('Error deleting CSV:', err));
+        .unlink(dataFilePath)
+        .catch((err) => console.error('Error deleting data file:', err));
 
       res.json({
         message: 'Certificates generated successfully',
@@ -322,8 +352,70 @@ app.get('/api/templates/:templateId/fields', async (req, res) => {
   }
 });
 
-// Serve static files from templates directory
+// Font management endpoints
+
+// Get all uploaded fonts
+app.get('/api/fonts', async (req, res) => {
+  try {
+    const fontsDir = 'fonts';
+    const files = await fs.readdir(fontsDir);
+    const fonts = files
+      .filter((file) => /\.(ttf|otf)$/i.test(file))
+      .map((file) => ({
+        id: file,
+        name: file.replace(/\.(ttf|otf)$/i, ''),
+        path: `/fonts/${file}`,
+      }));
+
+    res.json({ fonts });
+  } catch (error) {
+    console.error('Error fetching fonts:', error);
+    res.status(500).json({ error: 'Failed to fetch fonts' });
+  }
+});
+
+// Upload custom font
+app.post('/api/fonts', upload.single('font'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No font file uploaded' });
+    }
+
+    const fontInfo = {
+      id: req.file.filename,
+      name: req.file.originalname.replace(/\.(ttf|otf)$/i, ''),
+      path: `/fonts/${req.file.filename}`,
+      savedPath: req.file.path,
+    };
+
+    res.json({
+      message: 'Font uploaded successfully',
+      font: fontInfo,
+    });
+  } catch (error) {
+    console.error('Error uploading font:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload font' });
+  }
+});
+
+// Delete font
+app.delete('/api/fonts/:fontId', async (req, res) => {
+  try {
+    const { fontId } = req.params;
+    const fontPath = path.join('fonts', fontId);
+
+    await fs.unlink(fontPath);
+
+    res.json({ message: 'Font deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting font:', error);
+    res.status(500).json({ error: 'Failed to delete font' });
+  }
+});
+
+// Serve static files from templates and fonts directories
 app.use('/templates', express.static('templates'));
+app.use('/fonts', express.static('fonts'));
 
 // Health check
 app.get('/api/health', (req, res) => {

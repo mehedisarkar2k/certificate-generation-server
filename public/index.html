@@ -38,6 +38,7 @@
                   <button id="refreshTemplates" class="btn btn-secondary">
                     🔄 Refresh
                   </button>
+                  <div id="templateGallery" class="template-gallery"></div>
                 </div>
               </div>
 
@@ -97,11 +98,11 @@
           </div>
           <div class="card-body">
             <div class="file-upload-area" id="csvDropZone">
-              <input type="file" id="csvFile" accept=".csv" hidden />
-              <p>📊 Click or drag CSV file here</p>
+              <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" hidden />
+              <p>📊 Click or drag CSV or Excel file here</p>
               <small
-                >CSV should contain columns like: name, course, date,
-                etc.</small
+                >Supported formats: CSV, XLSX, XLS (Excel)<br />
+                CSV should contain columns like: name, course, date, etc.</small
               >
             </div>
 

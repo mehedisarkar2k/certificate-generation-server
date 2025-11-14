@@ -264,11 +264,11 @@
         <div class="canvas-section">
           <h3>Template Image</h3>
           <div class="csv-preview-section">
-            <h4>Upload CSV to see available columns:</h4>
+            <h4>Upload CSV/Excel to see available columns:</h4>
             <input
               type="file"
               id="csvFileMapper"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               class="form-control"
               style="margin-bottom: 10px"
             />
@@ -283,6 +283,54 @@
         <!-- Controls Section -->
         <div class="controls-section">
           <h3>Field Mappings</h3>
+
+          <!-- Font Management Section -->
+          <div
+            class="add-field-section"
+            style="background: #e8f5e9; border: 2px solid #4caf50"
+          >
+            <h4 style="margin-bottom: 10px; color: #2e7d32">🔤 Custom Fonts</h4>
+            <div
+              style="
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                margin-bottom: 8px;
+              "
+            >
+              <input
+                type="file"
+                id="fontFileInput"
+                accept=".ttf,.otf"
+                multiple
+                style="flex: 1; font-size: 0.85rem"
+              />
+              <button
+                id="uploadFontBtn"
+                class="btn btn-primary"
+                style="
+                  white-space: nowrap;
+                  background: #4caf50;
+                  border-color: #4caf50;
+                "
+              >
+                ⬆️ Upload Font
+              </button>
+            </div>
+            <div
+              id="selectedFontName"
+              style="
+                font-size: 0.85rem;
+                color: #2e7d32;
+                margin-bottom: 8px;
+                font-style: italic;
+              "
+            ></div>
+            <div
+              id="fontListDisplay"
+              style="margin-top: 10px; font-size: 0.85rem; color: #666"
+            ></div>
+          </div>
 
           <div class="add-field-section">
             <button

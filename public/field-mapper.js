@@ -4,10 +4,12 @@ let state = {
   templateId: null,
   fields: [],
   csvColumns: [],
+  csvData: null, // Store first row of CSV for preview
   canvas: null,
   ctx: null,
   scale: 1,
   nextFieldId: 1,
+  customFonts: [], // List of uploaded custom fonts
 };
 
 // DOM Elements
@@ -20,13 +22,16 @@ const saveTemplateBtn = document.getElementById('saveTemplateWithFields');
 const csvFileMapper = document.getElementById('csvFileMapper');
 const csvColumnsDisplay = document.getElementById('csvColumnsDisplay');
 const notification = document.getElementById('notification');
+const fontFileInput = document.getElementById('fontFileInput');
+const uploadFontBtn = document.getElementById('uploadFontBtn');
+const fontListDisplay = document.getElementById('fontListDisplay');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initializeMapper();
 });
 
-function initializeMapper() {
+async function initializeMapper() {
   // Get template ID from URL
   const urlParams = new URLSearchParams(window.location.search);
   const templateId = urlParams.get('templateId');
@@ -43,12 +48,17 @@ function initializeMapper() {
   const templateSrc = `/templates/${templateId}`;
   loadTemplateImage(templateSrc);
 
-  // Load existing field mappings if they exist
-  loadExistingFieldMappings(templateId);
+  // Load custom fonts first (await to ensure they're loaded before fields render)
+  await loadCustomFonts();
+
+  // Load existing field mappings if they exist (after fonts are loaded)
+  await loadExistingFieldMappings(templateId);
 
   // Event listeners
   canvas.addEventListener('click', handleCanvasClick);
   csvFileMapper.addEventListener('change', handleCSVUpload);
+  fontFileInput.addEventListener('change', handleFontFileSelect);
+  uploadFontBtn.addEventListener('click', handleFontUpload);
   saveTemplateBtn.addEventListener('click', handleSaveTemplate);
 }
 
@@ -93,6 +103,7 @@ function addField(x, y, columnName = null) {
     y: y,
     fontSize: 36,
     font: 'Helvetica-Bold',
+    fontWeight: 'normal',
     color: '#000000',
     align: 'left', // Default to left so text starts at clicked point
     width: 500,
@@ -111,9 +122,29 @@ function redrawCanvas() {
     ctx.drawImage(state.templateImage, 0, 0);
   }
 
-  // Draw markers for each field
+  // Draw markers and preview text for each field
   state.fields.forEach((field) => {
-    // Draw crosshair
+    // Draw preview text if CSV data is available
+    if (state.csvData && state.csvData[field.csvColumn]) {
+      const previewText = state.csvData[field.csvColumn];
+
+      // Set font properties for preview
+      const fontSize = field.fontSize || 36;
+      const fontWeight = field.fontWeight || 'normal';
+      const fontFamily = 'Arial'; // Canvas uses web fonts
+
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.fillStyle = field.color || '#000000';
+
+      // Draw text at field position based on alignment
+      const align = field.align || 'left';
+      ctx.textAlign = align;
+
+      // Use baseline 'top' to match the click position better
+      ctx.textBaseline = 'top';
+
+      ctx.fillText(previewText, field.x, field.y);
+    } // Draw crosshair marker
     ctx.strokeStyle = '#667eea';
     ctx.lineWidth = 2;
 
@@ -138,12 +169,17 @@ function redrawCanvas() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw label
+    // Draw field label (column name)
     ctx.font = 'bold 14px Arial';
     ctx.fillStyle = '#667eea';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.fillText(field.csvColumn, field.x, field.y - 25);
   });
+
+  // Reset text properties
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }
 
 function renderFieldList() {
@@ -224,18 +260,75 @@ function renderFieldList() {
                     <select onchange="updateField(${
                       field.id
                     }, 'font', this.value)">
-                        <option value="Helvetica" ${
-                          field.font === 'Helvetica' ? 'selected' : ''
-                        }>Helvetica</option>
-                        <option value="Helvetica-Bold" ${
-                          field.font === 'Helvetica-Bold' ? 'selected' : ''
-                        }>Helvetica Bold</option>
-                        <option value="Times-Roman" ${
-                          field.font === 'Times-Roman' ? 'selected' : ''
-                        }>Times Roman</option>
-                        <option value="Courier" ${
-                          field.font === 'Courier' ? 'selected' : ''
-                        }>Courier</option>
+                        <optgroup label="Standard Fonts">
+                            <option value="Helvetica" ${
+                              field.font === 'Helvetica' ? 'selected' : ''
+                            }>Helvetica</option>
+                            <option value="Helvetica-Bold" ${
+                              field.font === 'Helvetica-Bold' ? 'selected' : ''
+                            }>Helvetica Bold</option>
+                            <option value="Times-Roman" ${
+                              field.font === 'Times-Roman' ? 'selected' : ''
+                            }>Times Roman</option>
+                            <option value="Courier" ${
+                              field.font === 'Courier' ? 'selected' : ''
+                            }>Courier</option>
+                        </optgroup>
+                        ${
+                          state.customFonts.length > 0
+                            ? `<optgroup label="Custom Fonts">
+                                ${state.customFonts
+                                  .map(
+                                    (font) =>
+                                      `<option value="${font.id}" ${
+                                        field.font === font.id ? 'selected' : ''
+                                      }>${font.name}</option>`
+                                  )
+                                  .join('')}
+                               </optgroup>`
+                            : ''
+                        }
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>Font Weight:</label>
+                    <select onchange="updateField(${
+                      field.id
+                    }, 'fontWeight', this.value)">
+                        <option value="normal" ${
+                          field.fontWeight === 'normal' ? 'selected' : ''
+                        }>Normal</option>
+                        <option value="bold" ${
+                          field.fontWeight === 'bold' ? 'selected' : ''
+                        }>Bold</option>
+                        <option value="100" ${
+                          field.fontWeight === '100' ? 'selected' : ''
+                        }>100 - Thin</option>
+                        <option value="200" ${
+                          field.fontWeight === '200' ? 'selected' : ''
+                        }>200 - Extra Light</option>
+                        <option value="300" ${
+                          field.fontWeight === '300' ? 'selected' : ''
+                        }>300 - Light</option>
+                        <option value="400" ${
+                          field.fontWeight === '400' ? 'selected' : ''
+                        }>400 - Normal</option>
+                        <option value="500" ${
+                          field.fontWeight === '500' ? 'selected' : ''
+                        }>500 - Medium</option>
+                        <option value="600" ${
+                          field.fontWeight === '600' ? 'selected' : ''
+                        }>600 - Semi Bold</option>
+                        <option value="700" ${
+                          field.fontWeight === '700' ? 'selected' : ''
+                        }>700 - Bold</option>
+                        <option value="800" ${
+                          field.fontWeight === '800' ? 'selected' : ''
+                        }>800 - Extra Bold</option>
+                        <option value="900" ${
+                          field.fontWeight === '900' ? 'selected' : ''
+                        }>900 - Black</option>
                     </select>
                 </div>
                 
@@ -313,6 +406,15 @@ function handleCSVUpload(e) {
     const headers = lines[0].split(',').map((h) => h.trim());
     state.csvColumns = headers;
 
+    // Parse first data row for preview
+    if (lines.length > 1) {
+      const firstRowValues = lines[1].split(',').map((v) => v.trim());
+      state.csvData = {};
+      headers.forEach((header, index) => {
+        state.csvData[header] = firstRowValues[index] || '';
+      });
+    }
+
     // Display columns
     csvColumnsDisplay.innerHTML = `
             <div class="csv-columns">
@@ -334,7 +436,13 @@ function handleCSVUpload(e) {
     // Update existing field dropdowns
     renderFieldList();
 
-    showNotification(`Loaded ${headers.length} columns from CSV`, 'success');
+    // Redraw canvas to show preview values
+    redrawCanvas();
+
+    showNotification(
+      `Loaded ${headers.length} columns from CSV with preview data`,
+      'success'
+    );
   };
   reader.readAsText(file);
 }
@@ -505,3 +613,181 @@ window.updateField = updateField;
 window.deleteField = deleteField;
 window.quickAddField = quickAddField;
 window.addAllUnmappedFields = addAllUnmappedFields;
+
+// Font Management Functions
+
+// Handle font file selection
+function handleFontFileSelect(e) {
+  const files = e.target.files;
+  const selectedFontName = document.getElementById('selectedFontName');
+
+  if (files && files.length > 0) {
+    const validExtensions = ['.ttf', '.otf'];
+    const fileNames = [];
+    let allValid = true;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name
+        .substring(file.name.lastIndexOf('.'))
+        .toLowerCase();
+
+      if (validExtensions.includes(fileExt)) {
+        fileNames.push(file.name);
+      } else {
+        allValid = false;
+      }
+    }
+
+    if (allValid && fileNames.length > 0) {
+      selectedFontName.innerHTML = `✅ Selected ${
+        fileNames.length
+      } font(s): <strong>${fileNames.join(
+        ', '
+      )}</strong> - Click "Upload Font" to save`;
+      selectedFontName.style.color = '#2e7d32';
+    } else if (fileNames.length > 0) {
+      selectedFontName.innerHTML = `⚠️ ${fileNames.length} valid font(s) selected. Some files were invalid (only TTF/OTF allowed).`;
+      selectedFontName.style.color = '#f57c00';
+    } else {
+      selectedFontName.innerHTML = `❌ Invalid file type(s). Please select TTF or OTF font files.`;
+      selectedFontName.style.color = '#dc3545';
+    }
+  } else {
+    selectedFontName.innerHTML = '';
+  }
+}
+
+// Load custom fonts from server
+async function loadCustomFonts() {
+  try {
+    const response = await fetch('/api/fonts');
+    const data = await response.json();
+    state.customFonts = data.fonts || [];
+    updateFontListDisplay();
+
+    // Re-render field list if fields exist (to show custom fonts in dropdowns)
+    if (state.fields.length > 0) {
+      renderFieldList();
+    }
+  } catch (error) {
+    console.error('Error loading custom fonts:', error);
+    showNotification('Failed to load custom fonts', 'error');
+  }
+}
+
+// Update font list display
+function updateFontListDisplay() {
+  if (state.customFonts.length === 0) {
+    fontListDisplay.innerHTML =
+      '<em style="color: #999;">No custom fonts uploaded yet</em>';
+  } else {
+    fontListDisplay.innerHTML = `
+      <strong>Available Custom Fonts:</strong><br/>
+      ${state.customFonts
+        .map(
+          (font) =>
+            `<span style="display: inline-block; margin: 4px 6px; padding: 4px 8px; background: white; border-radius: 4px; font-size: 0.8rem;">
+              ${font.name}
+              <button onclick="deleteFont('${font.id}')" style="margin-left: 5px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: bold;">×</button>
+            </span>`
+        )
+        .join('')}
+    `;
+  }
+}
+
+// Handle font upload
+async function handleFontUpload() {
+  const files = fontFileInput.files;
+  if (!files || files.length === 0) {
+    showNotification('Please select font file(s)', 'error');
+    return;
+  }
+
+  const validExtensions = ['.ttf', '.otf'];
+  let successCount = 0;
+  let errorCount = 0;
+
+  showNotification(`Uploading ${files.length} font(s)...`, 'info');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const fileExt = file.name
+      .substring(file.name.lastIndexOf('.'))
+      .toLowerCase();
+
+    if (!validExtensions.includes(fileExt)) {
+      errorCount++;
+      continue;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('font', file);
+
+      const response = await fetch('/api/fonts', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        successCount++;
+      } else {
+        errorCount++;
+        console.error(`Failed to upload ${file.name}:`, data.error);
+      }
+    } catch (error) {
+      errorCount++;
+      console.error(`Error uploading ${file.name}:`, error);
+    }
+  }
+
+  if (successCount > 0) {
+    showNotification(
+      `${successCount} font(s) uploaded successfully!`,
+      'success'
+    );
+    fontFileInput.value = '';
+    document.getElementById('selectedFontName').innerHTML = '';
+    await loadCustomFonts();
+    renderFieldList(); // Re-render to show new fonts in dropdowns
+  }
+
+  if (errorCount > 0) {
+    showNotification(`${errorCount} font(s) failed to upload`, 'error');
+  }
+}
+
+// Delete custom font
+async function deleteFont(fontId) {
+  if (!confirm('Are you sure you want to delete this font?')) {
+    return;
+  }
+
+  try {
+    showNotification('Deleting font...', 'info');
+
+    const response = await fetch(`/api/fonts/${fontId}`, {
+      method: 'DELETE',
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showNotification('Font deleted successfully', 'success');
+      await loadCustomFonts();
+      renderFieldList(); // Re-render to update font dropdowns
+    } else {
+      throw new Error(data.error || 'Failed to delete font');
+    }
+  } catch (error) {
+    console.error('Error deleting font:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  }
+}
+
+// Make font functions globally available
+window.deleteFont = deleteFont;
