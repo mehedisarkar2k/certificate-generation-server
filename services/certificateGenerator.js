@@ -105,18 +105,17 @@ async function generateSingleCertificate(
           const fontName = mapping.font || 'Helvetica-Bold';
           const fontSize = mapping.fontSize || 36;
 
-          // Check if it's a custom font (contains timestamp/uuid pattern)
-          if (
-            fontName.includes('-') &&
-            (fontName.endsWith('.ttf') || fontName.endsWith('.otf'))
-          ) {
-            // It's a custom font file
+          // Check if it's a custom font (has file extension)
+          if (fontName.endsWith('.ttf') || fontName.endsWith('.otf')) {
+            // It's a custom font file - add fonts/ directory
             const fontPath = path.join('fonts', fontName);
             try {
+              // Check if file exists
+              await fs.access(fontPath);
               doc.font(fontPath).fontSize(fontSize);
             } catch (fontError) {
               console.warn(
-                `Custom font not found: ${fontName}, using Helvetica-Bold`
+                `Custom font not found at ${fontPath}, using Helvetica-Bold`
               );
               doc.font('Helvetica-Bold').fontSize(fontSize);
             }

@@ -37,10 +37,15 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(
-      file.originalname
-    )}`;
-    cb(null, uniqueName);
+    // For fonts, use original filename. For others, use unique name
+    if (file.fieldname === 'font') {
+      cb(null, file.originalname);
+    } else {
+      const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(
+        file.originalname
+      )}`;
+      cb(null, uniqueName);
+    }
   },
 });
 
@@ -363,7 +368,7 @@ app.get('/api/fonts', async (req, res) => {
       .filter((file) => /\.(ttf|otf)$/i.test(file))
       .map((file) => ({
         id: file,
-        name: file.replace(/\.(ttf|otf)$/i, ''),
+        name: file, // Keep the full filename with extension
         path: `/fonts/${file}`,
       }));
 
@@ -383,7 +388,7 @@ app.post('/api/fonts', upload.single('font'), async (req, res) => {
 
     const fontInfo = {
       id: req.file.filename,
-      name: req.file.originalname.replace(/\.(ttf|otf)$/i, ''),
+      name: req.file.originalname, // Keep the full filename with extension
       path: `/fonts/${req.file.filename}`,
       savedPath: req.file.path,
     };

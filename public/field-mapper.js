@@ -60,6 +60,12 @@ async function initializeMapper() {
   fontFileInput.addEventListener('change', handleFontFileSelect);
   uploadFontBtn.addEventListener('click', handleFontUpload);
   saveTemplateBtn.addEventListener('click', handleSaveTemplate);
+
+  // Preview button
+  const generatePreviewBtn = document.getElementById('generatePreviewBtn');
+  if (generatePreviewBtn) {
+    generatePreviewBtn.addEventListener('click', handleGeneratePreview);
+  }
 }
 
 function loadTemplateImage(src) {
@@ -791,3 +797,80 @@ async function deleteFont(fontId) {
 
 // Make font functions globally available
 window.deleteFont = deleteFont;
+
+// Preview Generation
+
+function handleGeneratePreview() {
+  if (!state.csvData) {
+    showNotification('Please upload a CSV file first to preview', 'error');
+    return;
+  }
+
+  if (state.fields.length === 0) {
+    showNotification('Please add at least one field to preview', 'error');
+    return;
+  }
+
+  generatePreview();
+}
+
+function generatePreview() {
+  const modal = document.getElementById('previewModal');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const previewCtx = previewCanvas.getContext('2d');
+
+  // Set canvas size to template size
+  previewCanvas.width = state.templateImage.width;
+  previewCanvas.height = state.templateImage.height;
+
+  // Draw template
+  previewCtx.drawImage(state.templateImage, 0, 0);
+
+  // Draw all fields with CSV data
+  state.fields.forEach((field) => {
+    if (state.csvData && state.csvData[field.csvColumn]) {
+      const text = state.csvData[field.csvColumn];
+
+      // Set font properties
+      const fontSize = field.fontSize || 36;
+      const fontWeight = field.fontWeight || 'normal';
+
+      // Use the actual font from field settings
+      let fontFamily = field.font || 'Arial';
+
+      // Check if it's a custom font (has file extension)
+      const isCustomFont = /\.(ttf|otf)$/i.test(fontFamily);
+      if (isCustomFont) {
+        // Extract font name without extension for canvas
+        const fontName = fontFamily.replace(/\.(ttf|otf)$/i, '');
+        fontFamily = `"${fontName}", Arial`;
+      }
+
+      previewCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      previewCtx.fillStyle = field.color || '#000000';
+
+      // Set alignment
+      const align = field.align || 'left';
+      previewCtx.textAlign = align;
+      previewCtx.textBaseline = 'top';
+
+      // Draw text
+      previewCtx.fillText(text, field.x, field.y);
+    }
+  });
+
+  // Show modal
+  modal.style.display = 'flex';
+
+  // Reset text properties
+  previewCtx.textAlign = 'left';
+  previewCtx.textBaseline = 'alphabetic';
+}
+
+function closePreviewModal() {
+  const modal = document.getElementById('previewModal');
+  modal.style.display = 'none';
+}
+
+// Make preview functions globally available
+window.closePreviewModal = closePreviewModal;

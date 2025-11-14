@@ -68,19 +68,47 @@ function setupEventListeners() {
     handleTemplateFileSelect
   );
 
-  // Save template button
-  saveTemplateBtn.addEventListener('click', handleSaveTemplate);
+  // Save template button (if exists)
+  if (saveTemplateBtn) {
+    saveTemplateBtn.addEventListener('click', handleSaveTemplate);
+  }
+
+  // Clear template button
+  const clearTemplateBtn = document.getElementById('clearTemplateBtn');
+  if (clearTemplateBtn) {
+    clearTemplateBtn.addEventListener('click', handleClearTemplate);
+  }
+
+  // Map fields for new template (with auto-save)
+  const mapFieldsNewBtn = document.getElementById('mapFieldsNewBtn');
+  if (mapFieldsNewBtn) {
+    mapFieldsNewBtn.addEventListener('click', handleMapFieldsNew);
+  }
 
   // CSV file upload
-  csvDropZone.addEventListener('click', () => csvFileInput.click());
-  csvFileInput.addEventListener('change', handleCSVFileSelect);
-  setupDragAndDrop(csvDropZone, csvFileInput, handleCSVFileSelect);
+  if (csvDropZone && csvFileInput) {
+    csvDropZone.addEventListener('click', () => {
+      console.log('CSV drop zone clicked, triggering file input');
+      csvFileInput.click();
+    });
+    csvFileInput.addEventListener('change', handleCSVFileSelect);
+    setupDragAndDrop(csvDropZone, csvFileInput, handleCSVFileSelect);
+  } else {
+    console.error('CSV elements not found:', { csvDropZone, csvFileInput });
+  }
 
   // Generate button
-  generateBtn.addEventListener('click', handleGenerate);
+  if (generateBtn) {
+    generateBtn.addEventListener('click', handleGenerate);
+    console.log('Generate button listener attached');
+  } else {
+    console.error('Generate button not found!');
+  }
 
   // Map fields button
-  mapFieldsBtn.addEventListener('click', handleMapFields);
+  if (mapFieldsBtn) {
+    mapFieldsBtn.addEventListener('click', handleMapFields);
+  }
 }
 
 // Template option change
@@ -197,18 +225,31 @@ function handleTemplateFileSelect(e) {
 
     state.templateFile = file;
 
-    // Show preview
+    // Show preview inline
     const reader = new FileReader();
     reader.onload = (e) => {
+      const newPreviewImage = document.getElementById('newPreviewImage');
+      const newTemplatePreview = document.getElementById('newTemplatePreview');
+      const templateDropZone = document.getElementById('templateDropZone');
+      const mapFieldsNewBtn = document.getElementById('mapFieldsNewBtn');
+
+      newPreviewImage.src = e.target.result;
+      newTemplatePreview.style.display = 'block';
+      templateDropZone.style.display = 'none';
+
+      mapFieldsNewBtn.dataset.templateSrc = e.target.result;
+
+      // Also update main preview for backward compatibility
       previewImage.src = e.target.result;
       templatePreview.style.display = 'block';
-      mapFieldsBtn.style.display = 'inline-block';
       mapFieldsBtn.dataset.templateSrc = e.target.result;
     };
     reader.readAsDataURL(file);
 
-    saveTemplateBtn.style.display = 'block';
-    showNotification('Template loaded successfully', 'success');
+    showNotification(
+      'Template loaded successfully. Click "Save & Map Fields" to continue.',
+      'success'
+    );
   }
 
   updateGenerateButton();
@@ -253,7 +294,9 @@ async function handleSaveTemplate() {
 
 // Handle CSV file selection
 function handleCSVFileSelect(e) {
+  console.log('handleCSVFileSelect called', e);
   const file = e.target.files[0];
+  console.log('Selected file:', file);
 
   if (file) {
     const validExtensions = ['.csv', '.xlsx', '.xls'];
@@ -267,6 +310,7 @@ function handleCSVFileSelect(e) {
     }
 
     state.csvFile = file;
+    console.log('CSV file set in state:', state.csvFile);
 
     // Parse and preview CSV/Excel
     if (fileExt === '.csv') {
@@ -297,6 +341,7 @@ function handleCSVFileSelect(e) {
   }
 
   updateGenerateButton();
+  console.log('Generate button disabled state:', generateBtn.disabled);
 }
 
 // Parse and preview CSV
@@ -351,6 +396,12 @@ function parseAndPreviewCSV(csvText) {
 
 // Handle generate
 async function handleGenerate() {
+  console.log('Generate button clicked!', {
+    csvFile: state.csvFile,
+    templateFile: state.templateFile,
+    templateId: state.templateId,
+  });
+
   if (!state.csvFile) {
     showNotification('Please upload a CSV file', 'error');
     return;
@@ -475,6 +526,65 @@ function handleMapFields() {
   window.open(mapperUrl, '_blank');
 }
 
+// Handle clear template (reset selection)
+function handleClearTemplate() {
+  state.templateFile = null;
+  const templateDropZone = document.getElementById('templateDropZone');
+  const newTemplatePreview = document.getElementById('newTemplatePreview');
+  const templateFileInput = document.getElementById('templateFile');
+
+  templateFileInput.value = '';
+  templateDropZone.style.display = 'block';
+  newTemplatePreview.style.display = 'none';
+
+  showNotification('Template cleared. Select a new file.', 'info');
+  updateGenerateButton();
+}
+
+// Handle map fields for new template (auto-save first)
+async function handleMapFieldsNew() {
+  console.log('handleMapFieldsNew called', state.templateFile);
+
+  if (!state.templateFile) {
+    showNotification('No template file selected', 'error');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('template', state.templateFile);
+
+    showNotification('Saving template...', 'info');
+
+    const response = await fetch('/api/templates', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Template saved:', data);
+
+    showNotification('Template saved! Opening field mapper...', 'success');
+    await loadTemplates();
+
+    // Update state with new template ID
+    state.templateId = data.template.id;
+
+    // Open field mapper
+    const mapperUrl = `/field-mapper.html?templateId=${data.template.id}`;
+    console.log('Opening mapper:', mapperUrl);
+    window.open(mapperUrl, '_blank');
+  } catch (error) {
+    console.error('Error saving template:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  }
+}
+
 // Show notification
 function showNotification(message, type = 'info') {
   notification.textContent = message;
@@ -485,6 +595,15 @@ function showNotification(message, type = 'info') {
     notification.style.display = 'none';
   }, 3000);
 }
+
+// Make handleMapFieldsNew globally accessible
+window.handleMapFieldsNew = handleMapFieldsNew;
+
+// Make handleCSVFileSelect globally accessible
+window.handleCSVFileSelect = handleCSVFileSelect;
+
+// Make handleGenerate globally accessible
+window.handleGenerate = handleGenerate;
 
 // Delete template
 async function deleteTemplate(templateId, templateName) {

@@ -52,7 +52,11 @@
                   class="sub-section"
                   style="display: none"
                 >
-                  <div class="file-upload-area" id="templateDropZone">
+                  <div
+                    class="file-upload-area"
+                    id="templateDropZone"
+                    style="display: block"
+                  >
                     <input
                       type="file"
                       id="templateFile"
@@ -62,13 +66,36 @@
                     <p>📤 Click or drag image here</p>
                     <small>Supported formats: PNG, JPG, JPEG</small>
                   </div>
-                  <button
-                    id="saveTemplateBtn"
-                    class="btn btn-secondary"
+
+                  <div
+                    id="newTemplatePreview"
+                    class="template-preview-inline"
                     style="display: none"
                   >
-                    💾 Save Template for Future Use
-                  </button>
+                    <div style="position: relative; display: inline-block">
+                      <img
+                        id="newPreviewImage"
+                        src=""
+                        alt="Template preview"
+                        style="max-width: 100%; border-radius: 8px"
+                      />
+                      <button
+                        id="clearTemplateBtn"
+                        class="btn-close-preview"
+                        title="Select different template"
+                      >
+                        ✖
+                      </button>
+                    </div>
+                    <button
+                      id="mapFieldsNewBtn"
+                      class="btn btn-primary"
+                      style="margin-top: 15px; width: 100%; display: block"
+                      onclick="window.handleMapFieldsNew && window.handleMapFieldsNew()"
+                    >
+                      🎯 Save & Map Fields on Template
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -97,8 +124,19 @@
             <h2>Step 2: Upload CSV Data</h2>
           </div>
           <div class="card-body">
-            <div class="file-upload-area" id="csvDropZone">
-              <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" hidden />
+            <div
+              class="file-upload-area"
+              id="csvDropZone"
+              style="cursor: pointer"
+              onclick="document.getElementById('csvFile').click()"
+            >
+              <input
+                type="file"
+                id="csvFile"
+                accept=".csv,.xlsx,.xls"
+                style="display: none"
+                onchange="if(window.handleCSVFileSelect) window.handleCSVFileSelect(event)"
+              />
               <p>📊 Click or drag CSV or Excel file here</p>
               <small
                 >Supported formats: CSV, XLSX, XLS (Excel)<br />
@@ -135,7 +173,12 @@ Mike Johnson,AI & Machine Learning,2024-01-17</pre
           </div>
           <div class="card-body">
             <div class="action-section">
-              <button id="generateBtn" class="btn btn-primary" disabled>
+              <button
+                id="generateBtn"
+                class="btn btn-primary"
+                disabled
+                onclick="if(window.handleGenerate) window.handleGenerate()"
+              >
                 🚀 Generate Certificates
               </button>
               <div
