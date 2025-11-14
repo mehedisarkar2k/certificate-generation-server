@@ -1,7 +1,12 @@
 node_modules/
-uploads/
-output/
-templates/
+uploads/*
+!uploads/.gitkeep
+output/*
+!output/.gitkeep
+templates/*
+!templates/.gitkeep
+fonts/*
+!fonts/.gitkeep
 *.log
 .DS_Store
 .env

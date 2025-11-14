@@ -427,14 +427,41 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Certificate Generator API is running' });
 });
 
+// Serve index.html for root path
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Catch-all route for any other paths - serve index.html
+app.get('*', (req, res) => {
+  // If it's an API route, return 404
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  // Otherwise serve index.html for client-side routing
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Start server
 const startServer = async () => {
   await initDirectories();
-  app.listen(PORT, () => {
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(
       `Certificate Generator Server running on http://localhost:${PORT}`
     );
     console.log(`Open your browser and navigate to http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', error);
+      process.exit(1);
+    }
   });
 };
 
