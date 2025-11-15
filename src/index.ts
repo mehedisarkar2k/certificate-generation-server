@@ -25,6 +25,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
+app.get('/', (req, res) => {
+    res.json({ message: "Welcome to the Certificate Generation API", status: 'ok', timestamp: new Date().toISOString() });
+});
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
