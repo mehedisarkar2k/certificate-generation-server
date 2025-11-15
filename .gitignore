@@ -11,3 +11,4 @@ fonts/*
 .DS_Store
 .env
 .old/
+dist/
