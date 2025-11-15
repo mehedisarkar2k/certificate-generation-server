@@ -10,3 +10,4 @@ fonts/*
 *.log
 .DS_Store
 .env
+.old/
